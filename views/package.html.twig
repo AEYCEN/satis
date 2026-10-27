@@ -1,18 +1,31 @@
-{% set row_class  = 'row mb-0' %}
-{% set col1_class = 'col-sm-3 col-md-2' %}
-{% set col2_class = 'col-sm-9 col-md-10' %}
+{% set platform_pattern = '{^(php(-64bit|-ipv6|-zts|-debug)?|hhvm|ext-.+|lib-.+|composer(-plugin-api|-runtime-api)?)$}i' %}
+{% set visible_releases = 10 %}
+{% set repository_url = package.highest.sourceUrl %}
+{% if repository_url starts with 'git@' %}{% set repository_url = 'https://' ~ repository_url[4:]|replace({':': '/'}) %}{% endif %}
+{% if repository_url ends with '.git' %}{% set repository_url = repository_url[:-4] %}{% endif %}
+{% if not (repository_url starts with 'http') %}{% set repository_url = null %}{% endif %}
 
-<div class="card {% if package.abandoned %}border-danger{% else %}border-primary{% endif %} mb-3">
-    <div id="{{ package.highest.name }}" class="card-header field-name filter-by {% if package.abandoned %}text-bg-danger{% else %}text-bg-primary{% endif %}">
-        <a href="#{{ package.highest.name }}" class="text-reset">
-            <svg class="octicon-link" width="16" height="16">
-                <use xlink:href="#octicon-link"></use>
-            </svg>
-            {{ package.highest.name }}
-        </a>
+<div class="card {% if package.abandoned %}border-danger{% endif %} mb-3">
+    <div id="{{ package.highest.name }}" class="card-header d-flex flex-wrap align-items-center gap-2 {% if package.abandoned %}text-bg-danger{% endif %}">
+        {% if repository_url %}
+        <a href="{{ repository_url }}" target="_blank" rel="noopener" title="Open repository" class="field-name filter-by fs-5 fw-semibold {% if package.abandoned %}text-reset{% endif %}">{{ package.highest.name }}</a>
+        {% else %}
+        <span class="field-name filter-by fs-5 fw-semibold">{{ package.highest.name }}</span>
+        {% endif %}
 
+        <span class="d-flex flex-wrap gap-1 ms-auto">
+            {% if package.highest.type %}
+            <span class="field-type filter-by badge rounded-pill text-bg-secondary">{{ package.highest.type }}</span>
+            {% endif %}
+            {% if package.highest.license %}
+            <span class="field-license filter-by badge rounded-pill text-bg-success">{{ package.highest.license|join(', ') }}</span>
+            {% endif %}
+        </span>
+    </div>
+
+    <div class="card-body">
         {% if package.abandoned %}
-        <p class="abandoned">
+        <p class="abandoned alert alert-danger py-2">
             <strong>Abandoned!</strong>
             Package is abandoned, you should avoid using it.
             {% if package.replacement %}
@@ -22,101 +35,175 @@
             {% endif %}
         </p>
         {% endif %}
-    </div>
 
-    <div class="card-body">
         {% if package.highest.description %}
-        <p class="field-description filter-by">{{ package.highest.description }}</p>
-        {% endif %}
-
-        <dl class="{{ row_class }}">
-            <dt class="{{ col1_class }}"></dt>
-            <dd class="{{ col2_class }}"></dd>
-
-        {% if package.highest.type %}
-            <dt class="{{ col1_class }} field-type">Type</dt>
-            <dd class="{{ col2_class }} field-type filter-by">{{ package.highest.type }}</dd>
+        <p class="field-description filter-by text-body-secondary {{ package.highest.keywords ? 'mb-2' : '' }}">{{ package.highest.description }}</p>
         {% endif %}
 
         {% if package.highest.keywords %}
-            <dt class="{{ col1_class }} field-keywords">Keywords</dt>
-            <dd class="{{ col2_class }} field-keywords filter-by">
-                {% for keyword in package.highest.keywords|sort %}
-                <span class="badge text-bg-info">{{ keyword }}</span>
-                {% endfor %}
-            </dd>
+        <p class="field-keywords filter-by d-flex flex-wrap gap-1 small text-body-secondary">
+            {% for keyword in package.highest.keywords|sort %}
+            <span class="rounded-pill bg-body-tertiary px-2">{{ keyword }}</span>
+            {% endfor %}
+        </p>
         {% endif %}
 
-        {% if package.highest.homepage %}
-            <dt class="{{ col1_class }} field-homepage">Homepage</dt>
-            <dd class="{{ col2_class }} field-homepage filter-by">
-                <a href="{{ package.highest.homepage }}">{{ package.highest.homepage }}</a>
-            </dd>
-        {% endif %}
-
-        {% if package.highest.license %}
-            <dt class="{{ col1_class }} field-license">License</dt>
-            <dd class="{{ col2_class }} field-license filter-by">{{ package.highest.license|join(', ') }}</dd>
-        {% endif %}
-
-        {% if package.highest.authors %}
-            <dt class="{{ col1_class }} field-authors">Authors</dt>
-            <dd class="{{ col2_class }} field-authors filter-by">
+        {% if package.highest.authors or package.highest.homepage or package.highest.support %}
+        <div class="d-flex flex-wrap align-items-center column-gap-3 row-gap-2 small text-body-secondary border-bottom pb-3 mb-3">
+            {% if package.highest.authors %}
+            <span class="field-authors filter-by d-flex flex-wrap align-items-center gap-1">
+                <span class="me-1">Authors:</span>
                 {% for author in package.highest.authors %}
-                    {%- if author.homepage -%}
-                        <a href="{{ author.homepage }}">{{ author.name }}</a>
+                {% set author_role %}{% if author.role %} <span class="small text-body-secondary">({{ author.role }})</span>{% endif %}{% endset %}
+                {% if author.email %}
+                <a class="rounded-pill border px-2 link-body-emphasis" href="mailto:{{ author.email }}" title="{{ author.email }}">{{ author.name }}{{ author_role }}</a>
+                {% elseif author.homepage %}
+                <a class="rounded-pill border px-2 link-body-emphasis" href="{{ author.homepage }}" target="_blank" rel="noopener">{{ author.name }}{{ author_role }}</a>
+                {% else %}
+                <span class="rounded-pill border px-2 text-body-emphasis">{{ author.name }}{{ author_role }}</span>
+                {% endif %}
+                {% endfor %}
+            </span>
+            {% endif %}
+
+            {% if package.highest.homepage %}
+            <a class="field-homepage filter-by link-secondary" href="{{ package.highest.homepage }}" target="_blank" rel="noopener" title="Homepage">{{ package.highest.homepage|replace({'https://': '', 'http://': ''})|trim('/', 'right') }}</a>
+            {% endif %}
+
+            {% if package.highest.support %}
+            <span class="field-support filter-by">
+                {% for support_type, support_url in package.highest.support %}
+                    {%- if support_type == 'email' -%}
+                        <a class="link-secondary" href="mailto:{{ support_url }}" title="{{ support_url }}">{{ support_type|capitalize }}</a>
                     {%- else -%}
-                        {{ author.name }}
+                        <a class="link-secondary" href="{{ support_url }}" target="_blank" rel="noopener" title="{{ support_url }}">{{ support_type|capitalize }}</a>
                     {%- endif -%}
                     {%- if not loop.last -%}, {% endif -%}
                 {% endfor %}
-            </dd>
+            </span>
+            {% endif %}
+        </div>
         {% endif %}
 
-        {% if package.highest.support %}
-            <dt class="{{ col1_class }} field-support">Support</dt>
-            <dd class="{{ col2_class }} field-support filter-by">
-                <ul class="list-unstyled m-0">
-                    {% for support_type, support_url in package.highest.support %}
-                    <li>{{ support_type|capitalize }}: <a href="{{ support_url }}">{{ support_url }}</a></li>
-                    {% endfor %}
-                </ul>
-            </dd>
-        {% endif %}
+        {# One row of releases; clicking a release shows its details below the row #}
+        <div class="field-releases filter-by release-list d-flex flex-wrap align-items-center gap-1" data-package-name="{{ package.highest.name }}">
+            <span class="w-100 small text-uppercase fw-semibold text-body-secondary mb-1">Releases</span>
 
-            <dt class="{{ col1_class }} field-releases">Releases</dt>
-            <dd class="{{ col2_class }} field-releases filter-by" data-package-name="{{ package.highest.name }}">
-                {% for version in package.versions %}
+            {% for version in package.versions %}
+            {% if loop.index == visible_releases + 1 %}
+            <details class="release-more">
+                <summary class="btn btn-sm btn-link text-decoration-none"><span class="more">+{{ loop.length - visible_releases }} more</span><span class="less">Show less</span></summary>
+            {% endif %}
 
-                {% set branch_alias = attribute(version.extra['branch-alias'], version.prettyVersion) %}
-                {%- if branch_alias -%}
-                    {% set branch_alias = ", branch-alias: " ~ branch_alias %}
-                {%- endif -%}
+            {% set branch_alias = attribute(version.extra['branch-alias'], version.prettyVersion) %}
+            {% set php_link = version.requires['php'] ?? null %}
 
-                {%- if package.highest.type == 'metapackage' -%}
-                {{ version.prettyVersion }}
-                {%- elseif version.distType -%}
-                <a class="badge rounded-pill text-bg-secondary" href="{{ version.distUrl }}" title="dist-reference: {{ version.distReference }}{{ branch_alias }}">{{ version.prettyVersion }}</a>
-                {%- elseif version.sourceUrl matches '#^https?:\\/\\/#' -%}
-                <a class="badge rounded-pill text-bg-secondary" href="{{ version.sourceUrl }}" title="source-reference: {{ version.sourceReference }}{{ branch_alias }}">{{ version.prettyVersion }}</a>
-                {%- else -%}
-                <span class="badge rounded-pill text-bg-secondary" title="source-reference: {{ version.sourceReference }}{{ branch_alias }}">{{ version.prettyVersion }}</span>
-                {%- endif -%}
-                {% endfor %}
-            </dd>
+            <details class="release" name="release-{{ package.highest.name }}"{% if loop.first %} open{% endif %}>
+                <summary class="btn btn-sm rounded-pill font-monospace {{ version.isDev ? 'btn-outline-secondary' : 'btn-outline-primary' }}" title="{{ version.isDev ? 'source' : 'dist' }}-reference: {{ version.isDev ? version.sourceReference : version.distReference }}{% if branch_alias %}, branch-alias: {{ branch_alias }}{% endif %}">{{ version.prettyVersion }}</summary>
+
+                <div class="release-panel border rounded-3 bg-body-tertiary p-3 mt-2">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <span class="fs-6 fw-semibold font-monospace text-body-emphasis">{{ version.prettyVersion }}</span>
+                        {% if branch_alias %}
+                        <span class="small text-body-secondary">alias {{ branch_alias }}</span>
+                        {% endif %}
+                        {% if version.releaseDate %}
+                        <time class="text-body-secondary ms-2" datetime="{{ version.releaseDate|date('c') }}" title="Released {{ version.releaseDate|date('D, d M Y H:i T') }}">{{ version.releaseDate|date('Y-m-d') }}</time>
+                        {% endif %}
+                        {% if php_link %}
+                        <span class="badge rounded-pill text-bg-primary font-monospace ms-auto">PHP {{ php_link.prettyConstraint }}</span>
+                        {% endif %}
+                    </div>
+
+                    <dl class="row g-2 small mb-0">
+                        {# Requires are always listed, the other link types only when present #}
+                        {% for title, links in {'Requires': version.requires|filter(link => not (link.target matches platform_pattern)), 'Requires (dev)': version.devRequires, 'Conflicts': version.conflicts, 'Replaces': version.replaces} %}
+                        {% if links|length or loop.first %}
+                        {# Packages of this repository first, then alphabetically #}
+                        {% set links = links|sort((a, b) => (packages[b.target] is defined) <=> (packages[a.target] is defined) ?: a.target <=> b.target) %}
+                        <dt class="col-sm-2 fw-normal text-body-secondary">{{ title }}</dt>
+                        <dd class="col-sm-10 mb-0">
+                            {% if links|length %}
+                            <details class="links">
+                                <summary class="text-primary">{{ links|length }} {{ links|length == 1 ? 'package' : 'packages' }}</summary>
+                                <div class="border rounded-3 bg-body mt-1 mb-2 py-1">
+                                <ul class="row row-cols-1 row-cols-lg-2 g-0 list-unstyled m-0">
+                                    {% for link in links %}
+                                    <li class="col d-flex justify-content-between gap-3 px-3 py-1">
+                                        {% if link.target matches platform_pattern %}
+                                        <span class="text-truncate font-monospace">{{ link.target }}</span>
+                                        {% else %}
+                                        <a class="text-truncate" href="{{ packages[link.target] is defined ? '#' ~ link.target : 'https://packagist.org/packages/' ~ link.target }}"{% if packages[link.target] is not defined %} target="_blank" rel="noopener"{% endif %}>{{ link.target }}</a>
+                                        {% endif %}
+                                        <span class="font-monospace text-body-secondary text-nowrap">{{ link.prettyConstraint }}</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                </div>
+                            </details>
+                            {% else %}
+                            <span class="fst-italic text-body-secondary">none</span>
+                            {% endif %}
+                        </dd>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if version.suggests %}
+                        <dt class="col-sm-2 fw-normal text-body-secondary">Suggests</dt>
+                        <dd class="col-sm-10 mb-0">
+                            <details class="links">
+                                <summary class="text-primary">{{ version.suggests|length }} {{ version.suggests|length == 1 ? 'package' : 'packages' }}</summary>
+                                <ul class="list-unstyled border rounded-3 bg-body m-0 mt-1 mb-2 py-1">
+                                    {% for name in version.suggests|keys|sort((a, b) => (packages[b] is defined) <=> (packages[a] is defined) ?: a <=> b) %}
+                                    <li class="px-3 py-1">
+                                        {% if name matches platform_pattern %}
+                                        <span class="font-monospace">{{ name }}</span>
+                                        {% else %}
+                                        <a href="{{ packages[name] is defined ? '#' ~ name : 'https://packagist.org/packages/' ~ name }}"{% if packages[name] is not defined %} target="_blank" rel="noopener"{% endif %}>{{ name }}</a>
+                                        {% endif %}
+                                        {% if version.suggests[name] %}<span class="text-body-secondary">{{ version.suggests[name] }}</span>{% endif %}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </details>
+                        </dd>
+                        {% endif %}
+
+                        {% for namespace in (version.autoload['psr-4'] ?? [])|keys %}
+                        <dt class="col-sm-2 fw-normal text-body-secondary">Namespace</dt>
+                        <dd class="col-sm-10 mb-0 text-break">
+                            {% if namespace %}
+                            <span class="font-monospace">{{ namespace }}</span>
+                            {% else %}
+                            <span class="fst-italic text-body-secondary" title="PSR-4 rule without a namespace prefix">none</span>
+                            {% endif %}
+                        </dd>
+                        {% endfor %}
+                        <dt class="col-sm-2 fw-normal text-body-secondary">Install</dt>
+                        <dd class="col-sm-10 mb-0 font-monospace text-break">
+                            <span class="user-select-none text-body-secondary">$</span>
+                            <span class="user-select-all" title="Click to select">composer require {{ package.highest.name }}:{{ version.isDev ? version.prettyVersion : '^' ~ version.prettyVersion|trim('v', 'left') }}</span>
+                        </dd>
+                    </dl>
+                </div>
+            </details>
+
+            {% if loop.last and loop.length > visible_releases %}
+            </details>
+            {% endif %}
+            {% endfor %}
+        </div>
 
         {% set package_dependencies = attribute(dependencies, name) %}
 
         {% if package_dependencies and package_dependencies|length %}
-            <dt class="{{ col1_class }} field-required-by">Required by</dt>
-            <dd class="{{ col2_class }} field-required-by filter-by">
-                <ul class="list-unstyled m-0">
-                    {% for dependency in package_dependencies %}
-                    <li><a href="#{{ dependency }}">{{ dependency }}</a></li>
-                    {% endfor %}
-                </ul>
-            </dd>
+        <p class="field-required-by filter-by small text-body-secondary mt-3 mb-0">
+            <span class="fw-semibold text-body-emphasis">Required by:</span>
+            {% for dependency in package_dependencies %}
+                <a href="#{{ dependency }}">{{ dependency }}</a>
+                {%- if not loop.last %}, {% endif %}
+            {% endfor %}
+        </p>
         {% endif %}
-        </dl>
     </div>
 </div>
