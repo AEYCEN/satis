@@ -19,27 +19,16 @@ pre.file {
 }
 
 .copy-snippet {
-    &__button svg {
+    line-height: 1;
+    vertical-align: middle;
+    svg {
         fill: currentColor;
         pointer-events: none;
+        vertical-align: middle;
     }
-    &__tooltip {
-        top: 100%;
-        left: 0;
-        transform: translateY(-50%);
-        transition:
-            opacity 0.25s,
-            transform 0.25s;
-        &.show {
-            transform: none;
-        }
-        .arrow {
-            left: 50%;
-            transform: translateX(-50%);
-        }
-        .tooltip-inner {
-            max-width: none;
-        }
+    &.copied::after {
+        content: 'Copied';
+        margin-left: map-get($spacers, 1);
     }
 }
 
@@ -51,11 +40,38 @@ a {
     }
 }
 
-// Bootstrap 5 removes hover and focus states for badges
-.filter-by a.badge.bg-secondary {
-    &:hover,
-    &:focus {
-        text-decoration: none;
-        background-color: $black !important;
+// Releases: the buttons stay in one row, the open release's panel spans the full width below it
+.release-list {
+    // Fallback for browsers without ::details-content: the open release and the
+    // collapsed releases take a row of their own
+    .release[open],
+    .release-more[open] {
+        flex-basis: 100%;
+    }
+    @supports selector(::details-content) {
+        .release,
+        .release-more,
+        [open]::details-content {
+            display: contents;
+        }
+        details:not([open])::details-content {
+            display: none;
+        }
+        .release-panel {
+            order: 2;
+            flex-basis: 100%;
+        }
+        .release-more[open] > summary {
+            order: 1;
+        }
+    }
+    .release[open] > summary {
+        color: var(--bs-btn-active-color);
+        background-color: var(--bs-btn-active-bg);
+        border-color: var(--bs-btn-active-border-color);
+    }
+    details[open] > summary .more,
+    details:not([open]) > summary .less {
+        display: none;
     }
 }

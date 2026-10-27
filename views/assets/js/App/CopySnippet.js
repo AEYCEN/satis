@@ -1,124 +1,63 @@
 /**
- * Provides code snippets for your composer.json file
- * for specific releases of packages
+ * Copies the "composer require" command of a release to the clipboard
  * @class
  */
 class CopySnippet {
     /**
-     *
-     * @param {string} widget - The main node to move around the DOM
-     * @param {string} snippetTextField - The text field to display release snippet
-     * @param {string} clipboardButton - Copies the snippet to the clipboard
-     * @param {string} tooltip - Show after copy to provide user feedback
-     * @param {string} releases - All releases for which to create snippets
+     * Bootstraps the class
+     * @param {string} buttons - Buttons that carry the snippet to copy in their data-snippet attribute
      */
-    constructor(widget, snippetTextField, clipboardButton, tooltip, releases) {
-        // Elements
-        this.widget = document.querySelector(widget)
-        this.snippetTextField = document.querySelector(snippetTextField)
-        this.clipboardButton = document.querySelector(clipboardButton)
-        this.tooltip = document.querySelector(tooltip)
-        this.releases = Array.prototype.slice.call(document.querySelectorAll(releases))
-
-        // Vars
-        this.currentActiveRelease = null
-        this.tooltipTimeout = 2000
-
-        // Init
-        if (this.widget && this.snippetTextField && this.clipboardButton && this.tooltip && this.releases.length) {
-            this.init()
-        }
+    constructor(buttons) {
+        this.buttons = Array.prototype.slice.call(document.querySelectorAll(buttons))
+        this.feedbackTimeout = 2000
+        this.buttons.forEach((button) => button.addEventListener('click', (event) => this.copy(event.currentTarget)))
     }
 
     /**
-     * Sets snippet to current release
-     * @param {MouseEvent} event - User just clicked on a release
-     * @listens
+     * Copies the snippet of a button to the clipboard and shows feedback on the button
+     * @param {HTMLButtonElement} button - The button that was clicked
      */
-    showCodeSnippetToCopy(event) {
-        event.preventDefault()
+    copy(button) {
+        const snippet = button.dataset.snippet
 
-        // Toggle the widget
-        if (this.currentActiveRelease === event.target) {
-            this.currentActiveRelease.classList.remove('bg-primary')
-            this.currentActiveRelease.classList.add('bg-secondary')
-            this.currentActiveRelease = null
-            this.widget.classList.add('d-none')
+        // The Clipboard API is only available in secure contexts and may reject, e.g. when the document is not focused
+        if ('clipboard' in navigator) {
+            navigator.clipboard.writeText(snippet).then(
+                () => this.showFeedback(button),
+                () => this.copyWithExecCommand(button, snippet),
+            )
             return
         }
 
-        // Remove old active release
-        if (this.currentActiveRelease) {
-            this.currentActiveRelease.classList.remove('bg-primary')
-            this.currentActiveRelease.classList.add('bg-secondary')
-        }
-
-        // Set current release as active
-        this.currentActiveRelease = event.target
-        this.currentActiveRelease.classList.remove('bg-secondary')
-        this.currentActiveRelease.classList.add('bg-primary')
-
-        // Build release string to copy to composer.json
-        const packageName = event.target.parentNode.dataset.packageName
-        const releaseVersion = event.target.textContent
-        this.snippetTextField.value = `"${packageName}": "${releaseVersion}"`
-
-        // Make sure the widget is visible and under these releases
-        this.widget.classList.remove('d-none')
-        event.target.parentNode.appendChild(this.widget)
-        this.snippetTextField.focus()
+        this.copyWithExecCommand(button, snippet)
     }
 
     /**
-     * Copies snippet and provide user feedback
+     * Fallback for insecure contexts and older browsers
+     * @param {HTMLButtonElement} button - The button that was clicked
+     * @param {string} snippet - The text to copy
      */
-    copyCodeSnippetToClipboard() {
-        this.snippetTextField.focus()
-
-        // Use Clipboard API to copy snippet
-        let updatedClipboardViaAPI = false
-        if ('permissions' in navigator && 'clipboard' in navigator) {
-            navigator.permissions.query({ name: 'clipboard-write' }).then((result) => {
-                if (result.state == 'granted' || result.state == 'prompt') {
-                    navigator.clipboard.writeText(this.snippetTextField.value)
-                    updatedClipboardViaAPI = true
-                }
-            })
-        }
-
-        // Fallback for older browsers
-        if (!updatedClipboardViaAPI) {
-            if ('clipboardData' in window) {
-                window.clipboardData.setData('Text', this.snippetTextField.value)
-            } else {
-                document.execCommand('copy')
-            }
-        }
-
-        this.tooltip.classList.add('show')
+    copyWithExecCommand(button, snippet) {
+        const textarea = document.createElement('textarea')
+        textarea.value = snippet
+        textarea.setAttribute('readonly', '')
+        textarea.style.position = 'absolute'
+        textarea.style.left = '-9999px'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+        this.showFeedback(button)
     }
 
     /**
-     * Fade the tooltip after a few seconds
-     * @param {TransitionEvent} event - CSS property transition for tooltips
-     * @listens
+     * Marks the button as copied for a moment
+     * @param {HTMLButtonElement} button - The button that was clicked
      */
-    tooltipFadeout(event) {
-        if ('transform' === event.propertyName && !event.target.style.transform.length) {
-            window.setTimeout(() => {
-                event.target.classList.remove('show')
-            }, this.tooltipTimeout)
-        }
-    }
-
-    /**
-     * Sets up event handlers
-     */
-    init() {
-        this.releases.forEach((elem) => elem.addEventListener('click', (event) => this.showCodeSnippetToCopy(event)))
-        this.snippetTextField.addEventListener('focus', (event) => event.target.select())
-        this.clipboardButton.addEventListener('click', () => this.copyCodeSnippetToClipboard())
-        this.tooltip.addEventListener('transitionend', (event) => this.tooltipFadeout(event))
+    showFeedback(button) {
+        button.classList.add('copied')
+        window.clearTimeout(button.feedbackTimer)
+        button.feedbackTimer = window.setTimeout(() => button.classList.remove('copied'), this.feedbackTimeout)
     }
 }
 

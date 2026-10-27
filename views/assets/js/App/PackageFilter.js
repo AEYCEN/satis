@@ -58,13 +58,11 @@ class PackageFilter {
         this.allPackages.forEach((elem) => {
             elem.classList.add('d-none')
 
-            // Get content either from specific fields, or the whole package
-            let filterableContent = elem.textContent
-
-            if (this.filterByValue) {
-                const fieldElement = elem.querySelector('.field-' + this.filterByValue + '.filter-by')
-                filterableContent = fieldElement ? fieldElement.textContent : ''
-            }
+            // Get content from a specific field, or from all fields marked as filterable
+            const fieldSelector = this.filterByValue
+                ? '.field-' + this.filterByValue + '.filter-by, .field-' + this.filterByValue + ' .filter-by'
+                : '.filter-by'
+            const filterableContent = Array.prototype.map.call(elem.querySelectorAll(fieldSelector), (field) => field.textContent).join(' ')
 
             // Does the search term exist within the given content?
             const displayPackage = filterableContent.toLowerCase().indexOf(needle) !== -1
